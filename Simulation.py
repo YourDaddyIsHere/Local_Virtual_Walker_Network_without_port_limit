@@ -229,7 +229,7 @@ class Simulation(DatagramProtocol):
             if node.honest == True:
                 node_to_introduce_id=(self.link_generator.get_next()[0]+self.honest_node_number)%self.honest_node_number
             if node.honest == False:
-                node_to_introduce_id=(self.link_generator.get_next()[0]+self.evil_node_number)%self.evil_node_number
+                node_to_introduce_id=self.honest_node_number+((self.link_generator.get_next()[0]+self.evil_node_number)%self.evil_node_number)
         #node_to_introduce = self.node_database.get_node_by_id(id=node_to_introduce_id)
         node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)
         #introduced_private_address = neighbor_to_introduce

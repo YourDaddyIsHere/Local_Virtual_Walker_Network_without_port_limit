@@ -17,7 +17,7 @@ class NodeTable(object):
         self.node_dict_by_id[node.id] = node
         address = (str(node.ip),int(node.port))
         self.node_dict_by_ip_and_port[address] = node.id 
-        #print("nodes add, the id is: "+str(node.id))
+        print("nodes add, the id is: "+str(node.id))
 
     def get_node_by_ip_and_port(self,ip,port):
         address = (str(ip),int(port))
