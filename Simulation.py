@@ -3,7 +3,7 @@ from Node_Database import NodeDatabase,Node
 from activewalker.crypto import LibNaCLSK, ECCrypto
 from activewalker.Message import Message
 import os
-from Generator import WalkNumberGenerator,LinkNumberGenerator
+from Generator import WalkNumberGenerator,LinkNumberGenerator,AttackEdgeGenerator
 from activewalker.Neighbor_group import Determinstic_NeighborGroup
 from activewalker.neighbor_discovery import NeighborDiscover
 from activewalker.HalfBlockDatabase import HalfBlock
@@ -13,6 +13,8 @@ from twisted.internet import task
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from hashlib import sha1
+from NodeTable import NodeTable
+import random
 BASE = os.path.dirname(os.path.abspath(__file__))
 
 class Placeholder(object):
@@ -37,9 +39,14 @@ class Simulation(DatagramProtocol):
         self.link_range = int(config["link_range"])
         self.ip_list = config["ip_list"]
         self.nodes_per_ip = int(config["nodes_per_ip"])+1
+        self.attack_edge_number=int(config["attack_edge_number"])
+        self.introduction_random_seed=int(config["introduction_random_seed"])
+        self.link_random_seed=int(config["link_random_seed"])
+        self.attack_edge_random_seed=int(config["attack_edge_random_seed"])
         print self.ip_list[0]
         self.crypto = ECCrypto()
-        self.node_database = NodeDatabase()
+        #self.node_database = NodeDatabase()
+        self.node_table = NodeTable()
         self.reactor = reactor
 
         self.master_key = "3081a7301006072a8648ce3d020106052b8104002703819200040503dac58c19267f12cb0cf667e480816cd2574acae" \
@@ -67,9 +74,10 @@ class Simulation(DatagramProtocol):
             node = Node()
             ip = self.ip_list[int(i/self.nodes_per_ip)]
             port = i%self.nodes_per_ip
-            node.set(public_key =key_pub_bin,private_key = key_bin,member_identity=self.crypto.key_to_hash(key_pub),honest=True,ip=ip,port=port)
+            node.set(public_key =key_pub_bin,private_key = key_bin,member_identity=self.crypto.key_to_hash(key_pub),honest=True,ip=ip,port=port,id=i)
             honest_nodes_list.append(node)
-        self.node_database.add_nodes(honest_nodes_list)
+        #self.node_database.add_nodes(honest_nodes_list)
+        self.node_table.add_nodes(honest_nodes_list)
 
         for i in range(self.honest_node_number+1,self.honest_node_number+self.evil_node_number+1):
             key = LibNaCLSK()
@@ -79,40 +87,68 @@ class Simulation(DatagramProtocol):
             node=Node()
             ip = self.ip_list[int(i/self.nodes_per_ip)]
             port = i%self.nodes_per_ip
-            node.set(public_key =key_pub_bin,private_key = key_bin,member_identity=self.crypto.key_to_hash(key_pub),honest=False,ip=ip,port=port)
+            node.set(public_key =key_pub_bin,private_key = key_bin,member_identity=self.crypto.key_to_hash(key_pub),honest=False,ip=ip,port=port,id=i)
             evil_nodes_list.append(node)
-        self.node_database.add_nodes(evil_nodes_list)
-        call(["cp","NodeDatabase.db","activewalker"])
+        #self.node_database.add_nodes(evil_nodes_list)
+        self.node_table.add_nodes(evil_nodes_list)
+        #call(["cp","NodeDatabase.db","activewalker"])
         call(["cp","Node_Database.py","activewalker"])
 
         print("creating determinstic random number generator")
         self.walk_generator = WalkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number)
         self.link_generator = LinkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number,number_of_link=self.link_per_node,
                                                   link_range=self.link_range,upload_cap=self.upload_cap,download_cap=self.download_cap)
+        self.attack_edge_generator = AttackEdgeGenerator(honest_node_number=self.honest_node_number,evil_node_number=self.evil_node_number,attack_edge_random_seed=self.attack_edge_random_seed)
+        self.attack_edge_dict = dict()
 
-        neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_database=self.node_database)
+        print("creating attack edge")
+        for i in range(0,self.attack_edge_number):
+            edge = self.attack_edge_generator.get_next()
+            self.attack_edge_dict[edge[0][0]] = (edge[0][1],edge[1])
+            self.attack_edge_dict[edge[0][1]] = (edge[0][0],(edge[1][1],edge[1][0]))
+
+
+        neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
         self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group)
         self.reactor.run()
 
     def generate_blocks(self,node):
-        data = self.link_generator.get_current()
-        blocks=[]
         crypto = ECCrypto()
-        print("the node's private key is: "+repr(node.private_key))
-        for i in range(1,len(data)):
-            record = data[i]
+        blocks=[]
+        if node.id in self.attack_edge_dict:
+            print("network:-------this node has attack block, now return its attack block----------")
+            print("the attack block public key is:")
             block = HalfBlock()
-            block.up = record[0]
-            block.total_up = record[0]
-            block.down = record[1]
-            block.total_down = record[1]
-            block.sequence_number = i
+            link_node_id = self.attack_edge_dict[node.id][0]
+            block.up = self.attack_edge_dict[node.id][1][0]
+            block.total_up = self.attack_edge_dict[node.id][1][0]
+            block.down = self.attack_edge_dict[node.id][1][1]
+            block.total_down = self.attack_edge_dict[node.id][1][1]
+            block.sequence_number = 1
             block.public_key = node.public_key
+            print(node.public_key)
             key = crypto.key_from_private_bin(node.private_key)
-            print("the type of key is")
-            print type(key)
             block.sign(key=key)
             blocks.append(block)
+        else:
+            data = self.link_generator.get_current()
+
+            print("the node's private key is: "+repr(node.private_key))
+            for i in range(1,len(data)):
+                record = data[i]
+                block = HalfBlock()
+                link_node_id = record[0]
+                block.up = record[1]
+                block.total_up = record[1]
+                block.down = record[2]
+                block.total_down = record[2]
+                block.sequence_number = i
+                block.public_key = node.public_key
+                key = crypto.key_from_private_bin(node.private_key)
+                print("the type of key is")
+                print type(key)
+                block.sign(key=key)
+                blocks.append(block)
         return blocks
 
 
@@ -121,7 +157,8 @@ class Simulation(DatagramProtocol):
         self.walker.handle_message(packet,sender_addr)
 
     def receive_packet(self,packet,destination_addr):
-        node = self.node_database.get_node_by_ip_and_port(ip=destination_addr[0],port=destination_addr[1])
+        #node = self.node_database.get_node_by_ip_and_port(ip=destination_addr[0],port=destination_addr[1])
+        node = self.node_table.get_node_by_ip_and_port(ip=destination_addr[0],port=destination_addr[1])
         d = Deferred()
         d.addCallback(self.handle_message)
         reactor.callLater(0, d.callback,(packet,destination_addr,node))
@@ -183,8 +220,18 @@ class Simulation(DatagramProtocol):
         message_request = Message(packet=packet)
         message_request.decode_introduction_request()
         #requester_neighbor = Neighbor(message_request.source_private_address,addr,identity = message_request.sender_identity)
-        node_to_introduce_id = (self.link_generator.get_next()[0]+int(node.id))%self.number_of_nodes
-        node_to_introduce = self.node_database.get_node_by_id(id=node_to_introduce_id)
+        #node_to_introduce_id = (self.link_generator.get_next()[0]+int(node.id))%self.number_of_nodes
+        node_to_introduce_id = None
+        if node.id in self.attack_edge_dict:
+            print("network:---------this node has attack edge--------------")
+            node_to_introduce_id = self.attack_edge_dict[node.id][0]
+        else:
+            if node.honest == True:
+                node_to_introduce_id=(self.link_generator.get_next()[0]+self.honest_node_number)%self.honest_node_number
+            if node.honest == False:
+                node_to_introduce_id=(self.link_generator.get_next()[0]+self.evil_node_number)%self.evil_node_number
+        #node_to_introduce = self.node_database.get_node_by_id(id=node_to_introduce_id)
+        node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)
         #introduced_private_address = neighbor_to_introduce
         #introduced_public_address = neighbor_to_introduce
         introduced_private_address = (str(node_to_introduce.ip),int(node_to_introduce.port))

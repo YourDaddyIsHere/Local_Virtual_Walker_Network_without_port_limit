@@ -37,6 +37,7 @@ class Node(object):
         self.member_identity = member_identity
         self.ip = ip
         self.port=port
+        self.id=id
 
 
 class NodeDatabase(object):

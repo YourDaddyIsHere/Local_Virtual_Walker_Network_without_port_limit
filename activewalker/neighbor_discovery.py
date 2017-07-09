@@ -103,11 +103,12 @@ class NeighborDiscover(DatagramProtocol):
             loop.start(1.0)
 
     def stopProtocol(self):
+        #time.sleep(5)
         self.database.close()
         self.database.trust_graph.draw_graph()
         print("the trusted list is now:")
-        for neighbor in self.neighbor_group.trusted_neighbors:
-            print (neighbor.get_private_address())
+        #for neighbor in self.neighbor_group.trusted_neighbors:
+            #print (neighbor.get_private_address())
 
     #take one step,visit a known neighbor (candidate)
     def visit_a_neighbor(self):
@@ -209,7 +210,7 @@ class NeighborDiscover(DatagramProtocol):
         else:
             introduced_private_address=("0.0.0.0",0)
             introduced_public_address=("0.0.0.0",0)
-        message_response = Message(neighbor_discovery=self,identifier=message_request.identifier,destination_address=addr,source_private_address =self.private_address,source_public_address=self.public_address,
+        message_response = Message(neighbor_discovery=self,identifier=message_request.identifier,destination_address=addr,source_private_address=self.private_address,source_public_address=self.public_address,
                                    private_introduction_address=introduced_private_address,public_introduction_address=introduced_public_address)
         message_response.encode_introduction_response()
         #now it is time to create puncture request
@@ -243,6 +244,7 @@ class NeighborDiscover(DatagramProtocol):
         if message.private_introduction_address!=("0.0.0.0",0) and message.public_introduction_address!=("0.0.0.0",0):
             introduced_neighbor = Neighbor(message.private_introduction_address,message.public_introduction_address)
             self.neighbor_group.add_neighbor_to_intro_list(introduced_neighbor)
+            self.neighbor_group.update_current_neighbor(responder=message_sender,introduced_neighbor=introduced_neighbor)
             print("new candidate has been added to intro list")
         #send a missing identity by the way
         identity = message.sender_identity
@@ -420,7 +422,9 @@ class NeighborDiscover(DatagramProtocol):
     def run(self):
         self.reactor.run()
 
+
+
 if __name__ == "__main__":
-    neighbor_discovery = NeighborDiscover(port=25000,step_limit=200)
+    neighbor_discovery = NeighborDiscover(port=25000,step_limit=3600)
     neighbor_discovery.run()
     print("run finish")

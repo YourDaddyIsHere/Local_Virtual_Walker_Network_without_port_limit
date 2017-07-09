@@ -22,6 +22,7 @@ class NeighborGroup(object):
 		@incoming_neighbors: a list of incoming neighbor
 		@intro_neighbors: a list of intro neighbor
 		"""
+		self.teleport_home_possibility=0.2
 		self.TRUSTED_LIFE_SPAN=57.5
 		self.OUTGOING_LIFE_SPAN=57.5
 		self.INCOMING_LIFE_SPAN=57.5
@@ -31,6 +32,7 @@ class NeighborGroup(object):
 		self.outgoing_neighbors = [] #49.75% probability
 		self.incoming_neighbors = [] #24.825%probability
 		self.intro_neighbors= [] #24.825%probability
+		self.current_neighbor = None #the last neighbor we visited, it is used to determine which neighbor we want to visit next
 		#self.trusted_neighbors.append(Neighbor(("127.0.0.1",1235),("127.0.0.1",1235),"255,255.255.255"))
 		self.tracker.append(Neighbor((u"130.161.119.206"      , 6421),(u"130.161.119.206"      , 6421),"255,255.255.255"))
 		self.tracker.append(Neighbor((u"130.161.119.206"      , 6422),(u"130.161.119.206"      , 6422),"255,255.255.255"))
@@ -72,11 +74,17 @@ class NeighborGroup(object):
 		return False
 
 	#check whether the two neighbors are the same
-	def is_same_neighbor(self,neighbor1,neighbor2):
-		if(neighbor1.get_private_address()==neighbor2.get_private_address() and neighbor1.get_public_address()==neighbor2.get_public_address() and neighbor1.identity == neighbor2.identity):
-			return True
+	def is_same_neighbor(self,neighbor1,neighbor2,compare_identity=True):
+		if compare_identity==True:
+			if(neighbor1.get_private_address()==neighbor2.get_private_address() and neighbor1.get_public_address()==neighbor2.get_public_address() and neighbor1.identity == neighbor2.identity):
+				return True
+			else:
+				return False
 		else:
-			return False
+			if(neighbor1.get_private_address()==neighbor2.get_private_address() and neighbor1.get_public_address()==neighbor2.get_public_address()):
+				return True
+			else:
+				return False
 
 	def associate_neigbhor_with_public_key(self,private_ip = "0.0.0.0",public_ip = "0.0.0.0",identity = None,public_key= None):
 		"""
@@ -199,12 +207,27 @@ class NeighborGroup(object):
 
 	def get_neighbor_to_walk(self):
 		self.clean_stale_neighbors()
-		neighbors_list =[]
-		list_type=""
-		while(len(neighbors_list)==0):
-			list_type,neighbors_list = self.choose_group()
-		random.shuffle(neighbors_list)
-		return neighbors_list[0]
+		if self.current_neighbor==None:
+			neighbors_list =[]
+			list_type=""
+			while(len(neighbors_list)==0):
+				list_type,neighbors_list = self.choose_group()
+			random.shuffle(neighbors_list)
+			return neighbors_list[0]
+		else:
+			random_number = random.random()*1000
+			#0.8 possibility to take next hop
+			if(random>=self.teleport_home_possibility*1000):
+				return self.current_neighbor
+			#0.2 possibility to teleport home and take a random neighbor in our inventory
+			else:
+				self.current_neighbor=None
+				neighbors_list =[]
+				list_type=""
+				while(len(neighbors_list)==0):
+					list_type,neighbors_list = self.choose_group()
+				random.shuffle(neighbors_list)
+				return neighbors_list[0]
 
 	def get_neighbor_to_introduce(self,neighbor):
 		self.clean_stale_neighbors()
@@ -217,6 +240,18 @@ class NeighborGroup(object):
 			return None
 		else:
 			return None
+	def update_current_neighbor(self,responder,introduced_neighbor):
+		if self.current_neighbor==None or self.is_same_neighbor(responder,self.current_neighbor,compare_identity=False):
+			print("responder is the current neighbor")
+			self.current_neighbor = introduced_neighbor
+		else:
+			print("responder is not current neighbor, ignore it")
+			print("responder is:")
+			print responder.get_public_address()
+			print responder.get_private_address()
+			print("current neighbor is:")
+			print self.current_neighbor.get_public_address()
+			print self.current_neighbor.get_private_address()
 
 
 
@@ -225,15 +260,15 @@ class NeighborGroup(object):
 
 
 class Determinstic_NeighborGroup(NeighborGroup):
-	def __init__(self,walk_generator,node_database):
+	def __init__(self,walk_generator,node_table):
 		super(Determinstic_NeighborGroup, self).__init__()
 		self.walk_generator=walk_generator
-		self.node_database = node_database
+		self.node_table = node_table
 
 	def get_neighbor_to_walk(self):
 		node_id = self.walk_generator.get_next()
 		#now we have the node ip, we should translate it to ip and port
-		node = self.node_database.get_node_by_id(id=node_id)
+		node = self.node_table.get_node_by_id(id=node_id)
 		node_address = (str(node.ip),int(node.port))
 		neighbor = Neighbor(node_address,node_address)
 		return neighbor
