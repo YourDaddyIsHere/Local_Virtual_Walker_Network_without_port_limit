@@ -59,7 +59,10 @@ class LinkNumberGenerator(object):
 
     def generate(self):
         result = []
-        result.append(self.introduction_generator.randint(-1*self.link_range,self.link_range))
+        node_id=0
+        while(node_id==0):
+            node_id=self.introduction_generator.randint(-1*self.link_range,self.link_range)
+        result.append(node_id)
         for i in range(0,self.number_of_link):
             upload_and_download = (self.introduction_generator.randint(-1*self.link_range,self.link_range),self.introduction_generator.randint(0,self.upload_cap),randint(0,self.download_cap))
             result.append(upload_and_download)
