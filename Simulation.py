@@ -4,7 +4,7 @@ from activewalker.crypto import LibNaCLSK, ECCrypto
 from activewalker.Message import Message
 import os
 from Generator import WalkNumberGenerator,LinkNumberGenerator,AttackEdgeGenerator
-from activewalker.Neighbor_group import Determinstic_NeighborGroup
+from activewalker.Neighbor_group import Determinstic_NeighborGroup,Pseudo_Random_NeighborGroup
 from activewalker.neighbor_discovery import NeighborDiscover
 from activewalker.HalfBlockDatabase import HalfBlock
 from subprocess import call
@@ -40,9 +40,13 @@ class Simulation(DatagramProtocol):
         self.ip_list = config["ip_list"]
         self.nodes_per_ip = int(config["nodes_per_ip"])+1
         self.attack_edge_number=int(config["attack_edge_number"])
+        self.walk_random_seed = int(config["walk_random_seed"])
         self.introduction_random_seed=int(config["introduction_random_seed"])
         self.link_random_seed=int(config["link_random_seed"])
         self.attack_edge_random_seed=int(config["attack_edge_random_seed"])
+        self.response_seed=int(config["response_seed"])
+        self.response_threshold = 0.5
+        self.tracker_evil_possibility = 0.6
         print self.ip_list[0]
         self.crypto = ECCrypto()
         #self.node_database = NodeDatabase()
@@ -98,6 +102,8 @@ class Simulation(DatagramProtocol):
         self.walk_generator = WalkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number)
         self.link_generator = LinkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number,number_of_link=self.link_per_node,
                                                   link_range=self.link_range,upload_cap=self.upload_cap,download_cap=self.download_cap)
+        self.response_generator = random.Random()
+        self.response_generator.seed(self.response_seed)
         self.attack_edge_generator = AttackEdgeGenerator(honest_node_number=self.honest_node_number,evil_node_number=self.evil_node_number,attack_edge_random_seed=self.attack_edge_random_seed)
         self.attack_edge_dict = dict()
 
@@ -108,7 +114,8 @@ class Simulation(DatagramProtocol):
             self.attack_edge_dict[edge[0][1]] = (edge[0][0],(edge[1][1],edge[1][0]))
 
 
-        neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
+        #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
+        neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
         self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group)
         self.reactor.run()
 
@@ -166,6 +173,7 @@ class Simulation(DatagramProtocol):
     def handle_message(self,args):
         #@param:node: the node which should receive this message
         packet = args[0]
+        #address of the node which should receive this packet
         destination_addr = args[1]
         node = args[2]
         active_walker_addr = ("127.0.0.1",25000)
@@ -187,7 +195,10 @@ class Simulation(DatagramProtocol):
             self.on_introduction_response(packet,active_walker_addr,node,placeholder)
         if message_type == 246:
             print("network:---here is a introduction-request")
-            self.on_introduction_request(packet,active_walker_addr,node,placeholder)
+            if destination_addr!=("1.1.1.1",1):
+                self.on_introduction_request(packet,active_walker_addr,node,placeholder)
+            else:
+                self.on_tracker_introduction_request(packet,active_walker_addr,node,placeholder)
         if message_type == 250:
             print("network:---here is a puncture request")
             #self.on_puncture_request(packet,active_walker_addr,node,placeholder)
@@ -216,13 +227,41 @@ class Simulation(DatagramProtocol):
 
     def on_introduction_response(self,packet,addr,placeholder):
         pass
+
+
+    #will be called when tracker get an introduction request
+    def on_tracker_introduction_request(self,packet,addr,node,placeholder):
+        #a random number, determine whether the tracker should response with a evil node
+        message_request = Message(packet=packet)
+        message_request.decode_introduction_request()
+        response_random_number = self.response_generator.random()
+        if response_random_number>self.tracker_evil_possibility:
+            #response with an honest node
+            node_to_introduce_id=(self.link_generator.get_next()[0]+self.honest_node_number)%self.honest_node_number
+        else:
+            node_to_introduce_id=self.honest_node_number+((self.link_generator.get_next()[0]+self.evil_node_number)%self.evil_node_number)
+        node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)
+        introduced_private_address = (str(node_to_introduce.ip),int(node_to_introduce.port))
+        introduced_public_address = (str(node_to_introduce.ip),int(node_to_introduce.port))
+        my_address = (str(node.ip),int(node.port))
+        message_response = Message(neighbor_discovery=placeholder,identifier=message_request.identifier,destination_address=addr,source_private_address =my_address,source_public_address=my_address,
+                                   private_introduction_address=introduced_private_address,public_introduction_address=introduced_public_address)
+        message_response.encode_introduction_response()
+        message_puncture_request = Message(neighbor_discovery=placeholder,source_private_address=message_request.source_private_address,source_public_address=message_request.source_public_address,
+                                               private_address_to_puncture=message_request.source_private_address,public_address_to_puncture=addr)
+        message_puncture_request.encode_puncture_request()
+        self.send_packet(message_response.packet,(str(node.ip),int(node.port)))
+
+    #will be called when a non-tracker node get an introduction request
     def on_introduction_request(self,packet,addr,node,placeholder):
+        #generate a random number, determine whether the node should response with an attack edge (if it has)
+        response_random_number = self.response_generator.random()
         message_request = Message(packet=packet)
         message_request.decode_introduction_request()
         #requester_neighbor = Neighbor(message_request.source_private_address,addr,identity = message_request.sender_identity)
         #node_to_introduce_id = (self.link_generator.get_next()[0]+int(node.id))%self.number_of_nodes
         node_to_introduce_id = None
-        if node.id in self.attack_edge_dict:
+        if node.id in self.attack_edge_dict and response_random_number>=self.response_threshold:
             print("network:---------this node has attack edge--------------")
             node_to_introduce_id = self.attack_edge_dict[node.id][0]
         else:

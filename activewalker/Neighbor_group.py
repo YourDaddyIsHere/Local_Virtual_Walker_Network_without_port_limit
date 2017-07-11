@@ -22,7 +22,7 @@ class NeighborGroup(object):
 		@incoming_neighbors: a list of incoming neighbor
 		@intro_neighbors: a list of intro neighbor
 		"""
-		self.teleport_home_possibility=0.2
+		self.teleport_home_possibility=1.0
 		self.TRUSTED_LIFE_SPAN=57.5
 		self.OUTGOING_LIFE_SPAN=57.5
 		self.INCOMING_LIFE_SPAN=57.5
@@ -215,9 +215,9 @@ class NeighborGroup(object):
 			random.shuffle(neighbors_list)
 			return neighbors_list[0]
 		else:
-			random_number = random.random()*1000
+			random_number = random.random()*200
 			#0.8 possibility to take next hop
-			if(random>=self.teleport_home_possibility*1000):
+			if(random_number>=self.teleport_home_possibility*200):
 				return self.current_neighbor
 			#0.2 possibility to teleport home and take a random neighbor in our inventory
 			else:
@@ -272,3 +272,63 @@ class Determinstic_NeighborGroup(NeighborGroup):
 		node_address = (str(node.ip),int(node.port))
 		neighbor = Neighbor(node_address,node_address)
 		return neighbor
+
+class Pseudo_Random_NeighborGroup(NeighborGroup):
+	def __init__(self,node_table,walk_random_seed=232323,tracker_address=("1.1.1.1",1)):
+		super(Pseudo_Random_NeighborGroup, self).__init__()
+		self.tracker=[]
+		self.tracker.append(Neighbor(tracker_address,tracker_address))
+		#print("the trackers contain:")
+		#for tracker in self.tracker:
+			#print tracker.get_public_address
+		self.node_table=node_table
+		self.walk_generator = random.Random()
+		self.walk_generator.seed(walk_random_seed)
+
+	def choose_group(self):
+		if(len(self.outgoing_neighbors)==0 and len(self.incoming_neighbors)==0 and len(self.intro_neighbors)==0 and len(self.trusted_neighbors)==0):
+			return ("tracker",self.tracker)
+		num_random = self.walk_generator.random()*1000
+		if(num_random>995):
+			return ("tracker",self.tracker)
+		elif(num_random>600):
+			return ("trusted neighbor",self.trusted_neighbors)
+		elif(num_random>300):
+			return ("outgoing",self.outgoing_neighbors)
+		elif(num_random>150):
+			return ("incoming",self.incoming_neighbors)
+		else:
+			return ("intro",self.intro_neighbors)
+
+	def get_neighbor_to_walk(self):
+		#we don't clean time out neighbors
+		#because as time goes by, due to the fluctation of laptop performance, for example, in turn 10000
+		#it is possible that a fast computer needs 30 seconds, hence its neighbor doesn't time out
+		#but in a slow computer, it takes 70 seconds, the old neighbors are time-out.
+		#so, even the random number generator is seudo random, the result is not repeatable
+		#self.clean_stale_neighbors()
+		if self.current_neighbor==None:
+			neighbors_list =[]
+			list_type=""
+			while(len(neighbors_list)==0):
+				list_type,neighbors_list = self.choose_group()
+			length = len(neighbors_list)
+			index=self.walk_generator.randint(0,length-1)
+			return neighbors_list[index]
+		else:
+			#random_number = random.random()*1000
+			random_number = self.walk_generator.random()*1000
+			#0.8 possibility to take next hop
+			if(random_number>=self.teleport_home_possibility*1000):
+				return self.current_neighbor
+			#0.2 possibility to teleport home and take a random neighbor in our inventory
+			else:
+				self.current_neighbor=None
+				neighbors_list =[]
+				list_type=""
+				while(len(neighbors_list)==0):
+					list_type,neighbors_list = self.choose_group()
+				#random.shuffle(neighbors_list)
+				length = len(neighbors_list)
+				index = self.walk_generator.randint(0,length-1)
+				return neighbors_list[index]
