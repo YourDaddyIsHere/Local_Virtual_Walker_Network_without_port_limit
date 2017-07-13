@@ -57,3 +57,6 @@ if __name__ == "__main__":
     d["b"]={"name":"33"}
     for item in d:
         print d[item]
+    for i in range(0,0):
+        print "hahahaha"
+    print(-100%4000)

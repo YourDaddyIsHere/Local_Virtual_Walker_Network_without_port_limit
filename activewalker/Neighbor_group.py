@@ -67,7 +67,7 @@ class NeighborGroup(object):
 	#check if the candidate is already in a list
 	def is_in_list(self,neighbor,neighbor_list):
 		for c in neighbor_list:
-			if self.is_same_neighbor(neighbor,c):
+			if self.is_same_neighbor(neighbor,c,compare_identity=False):
 				return True
 			else:
 				continue
@@ -273,6 +273,9 @@ class Determinstic_NeighborGroup(NeighborGroup):
 		neighbor = Neighbor(node_address,node_address)
 		return neighbor
 
+
+
+
 class Pseudo_Random_NeighborGroup(NeighborGroup):
 	def __init__(self,node_table,walk_random_seed=232323,tracker_address=("1.1.1.1",1)):
 		super(Pseudo_Random_NeighborGroup, self).__init__()
@@ -287,17 +290,23 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 
 	def choose_group(self):
 		if(len(self.outgoing_neighbors)==0 and len(self.incoming_neighbors)==0 and len(self.intro_neighbors)==0 and len(self.trusted_neighbors)==0):
+			print("all other lists are empty, return a tracker")
 			return ("tracker",self.tracker)
 		num_random = self.walk_generator.random()*1000
 		if(num_random>995):
+			print("take walk to a tracker")
 			return ("tracker",self.tracker)
 		elif(num_random>600):
+			print("take a walk to a trusted_neighbor")
 			return ("trusted neighbor",self.trusted_neighbors)
 		elif(num_random>300):
+			print("take a walk to a out_going_neighbor")
 			return ("outgoing",self.outgoing_neighbors)
 		elif(num_random>150):
+			print("take a walk to a incoming_neighbor")
 			return ("incoming",self.incoming_neighbors)
 		else:
+			print("take a walk to intro_neighbor")
 			return ("intro",self.intro_neighbors)
 
 	def get_neighbor_to_walk(self):
@@ -314,6 +323,7 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 				list_type,neighbors_list = self.choose_group()
 			length = len(neighbors_list)
 			index=self.walk_generator.randint(0,length-1)
+			print("take a walk to neighbor: "+str(neighbors_list[index].get_public_address()))
 			return neighbors_list[index]
 		else:
 			#random_number = random.random()*1000
@@ -331,4 +341,5 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 				#random.shuffle(neighbors_list)
 				length = len(neighbors_list)
 				index = self.walk_generator.randint(0,length-1)
+				print("take a walk to neighbor: "+str(neighbors_list[index].get_public_address()))
 				return neighbors_list[index]

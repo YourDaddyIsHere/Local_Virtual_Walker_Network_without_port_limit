@@ -29,6 +29,10 @@ class Placeholder(object):
 
 class Simulation(DatagramProtocol):
     def __init__(self,port=30000,config_file=os.path.join(BASE, 'config.conf')):
+        if os.path.isfile(os.path.join(BASE, 'BlockDataBase.db')):
+            call(["rm","BlockDataBase.db"])
+        if os.path.isfile("activewalker/BlockDataBase.db"):
+            call(["rm","activewalker/BlockDataBase.db"])
         config = ConfigObj(config_file)
         self.port=port
         self.honest_node_number = int(config["honest_node_number"])
@@ -44,10 +48,11 @@ class Simulation(DatagramProtocol):
         self.walk_random_seed = int(config["walk_random_seed"])
         self.introduction_random_seed=int(config["introduction_random_seed"])
         self.link_random_seed=int(config["link_random_seed"])
+        self.block_random_seed = int(config["block_random_seed"])
         self.attack_edge_random_seed=int(config["attack_edge_random_seed"])
         self.response_seed=int(config["response_seed"])
         self.response_threshold = 0.5
-        self.tracker_evil_possibility = 0.6
+        self.tracker_evil_possibility = 0.0
         print self.ip_list[0]
         self.crypto = ECCrypto()
         #self.node_database = NodeDatabase()
@@ -103,7 +108,16 @@ class Simulation(DatagramProtocol):
         print("creating determinstic random number generator")
         self.walk_generator = WalkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number)
         self.link_generator = LinkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number,number_of_link=self.link_per_node,
-                                                  link_range=self.link_range,upload_cap=self.upload_cap,download_cap=self.download_cap)
+                                                  link_range=self.link_range,upload_cap=self.upload_cap,download_cap=self.download_cap,
+                                                  introduction_seed=self.introduction_random_seed,block_seed=self.block_random_seed)
+
+        self.link_generator_tracker = LinkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number,number_of_link=self.link_per_node,
+                                                  link_range=self.link_range,upload_cap=self.upload_cap,download_cap=self.download_cap,
+                                                  introduction_seed=self.introduction_random_seed+10,block_seed=self.block_random_seed+10)
+
+        self.link_generator_block = LinkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number,number_of_link=self.link_per_node,
+                                                  link_range=self.link_range,upload_cap=self.upload_cap,download_cap=self.download_cap,
+                                                  introduction_seed=self.introduction_random_seed+20,block_seed=self.block_random_seed+20)
         self.response_generator = random.Random()
         self.response_generator.seed(self.response_seed)
         self.attack_edge_generator = AttackEdgeGenerator(honest_node_number=self.honest_node_number,evil_node_number=self.evil_node_number,attack_edge_random_seed=self.attack_edge_random_seed)
@@ -116,18 +130,19 @@ class Simulation(DatagramProtocol):
             self.attack_edge_dict[edge[0][0]] = (edge[0][1],edge[1])
             self.attack_edge_dict[edge[0][1]] = (edge[0][0],(edge[1][1],edge[1][0]))
         """
-
+        print("we have "+str(self.attack_edge_number)+" attack edges")
         for i in range(0,self.attack_edge_number):
             edge = ((0,0),(0,0))
             while (self.attack_edges.has_edge(start_node=edge[0][1],end_node=edge[1][0]) or edge==((0,0),(0,0))):
                 edge = self.attack_edge_generator.get_next()
                 self.attack_edges.add_edge(start_node=edge[0][0],end_node=edge[0][1],upload=edge[1][0],download=edge[1][1])
                 self.attack_edges.add_edge(start_node=edge[0][1],end_node=edge[0][0],upload=edge[1][1],download=edge[1][0])
+                print("attack edge added")
 
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
         neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=1000)
+        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=100)
         self.reactor.run()
         #now experiment stop, we should collect data and run analysis
         #call(["mkdir","testdir"])
@@ -172,7 +187,7 @@ class Simulation(DatagramProtocol):
                 blocks.append(block)
 
         else:
-            data = self.link_generator.get_current()
+            data = self.link_generator_block.get_current()
 
             print("the node's private key is: "+repr(node.private_key))
             for i in range(1,len(data)):
@@ -271,9 +286,14 @@ class Simulation(DatagramProtocol):
         response_random_number = self.response_generator.random()
         if response_random_number>self.tracker_evil_possibility:
             #response with an honest node
-            node_to_introduce_id=(self.link_generator.get_next()[0]+self.honest_node_number)%self.honest_node_number
+            print("trakcer:################introduce a honest node")
+            node_to_introduce_id=((self.link_generator_tracker.get_next()[0]+node.id)%self.honest_node_number)+1
+            print("node to introduce is: "+str(node_to_introduce_id))
         else:
-            node_to_introduce_id=self.honest_node_number+((self.link_generator.get_next()[0]+self.evil_node_number)%self.evil_node_number)
+            print("tracker:################introduce a evil node")
+            #response with an evil node
+            node_to_introduce_id=(self.honest_node_number+((self.link_generator_tracker.get_next()[0]+node.id)%self.evil_node_number))+1
+            print("node to introduce is: "+str(node_to_introduce_id))
         node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)
         introduced_private_address = (str(node_to_introduce.ip),int(node_to_introduce.port))
         introduced_public_address = (str(node_to_introduce.ip),int(node_to_introduce.port))
@@ -308,9 +328,9 @@ class Simulation(DatagramProtocol):
 
         else:
             if node.honest == True:
-                node_to_introduce_id=(self.link_generator.get_next()[0]+node.id)%self.honest_node_number
+                node_to_introduce_id=((self.link_generator.get_next()[0]+node.id)%self.honest_node_number)+1
             if node.honest == False:
-                node_to_introduce_id=self.honest_node_number+((self.link_generator.get_next()[0]+node.id)%self.evil_node_number)
+                node_to_introduce_id=(self.honest_node_number+((self.link_generator.get_next()[0]+node.id)%self.evil_node_number))+1
         #node_to_introduce = self.node_database.get_node_by_id(id=node_to_introduce_id)
         node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)
         #introduced_private_address = neighbor_to_introduce
