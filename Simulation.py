@@ -15,6 +15,7 @@ from twisted.internet.defer import Deferred
 from hashlib import sha1
 from NodeTable import NodeTable
 import random
+from EdgeSet import EdgeSet
 BASE = os.path.dirname(os.path.abspath(__file__))
 
 class Placeholder(object):
@@ -52,6 +53,7 @@ class Simulation(DatagramProtocol):
         #self.node_database = NodeDatabase()
         self.node_table = NodeTable()
         self.reactor = reactor
+        self.attack_edges = EdgeSet()
 
         self.master_key = "3081a7301006072a8648ce3d020106052b8104002703819200040503dac58c19267f12cb0cf667e480816cd2574acae" \
                      "5293b59d7c3da32e02b4747f7e2e9e9c880d2e5e2ba8b7fcc9892cb39b797ef98483ffd58739ed20990f8e3df7d1ec5" \
@@ -105,13 +107,22 @@ class Simulation(DatagramProtocol):
         self.response_generator = random.Random()
         self.response_generator.seed(self.response_seed)
         self.attack_edge_generator = AttackEdgeGenerator(honest_node_number=self.honest_node_number,evil_node_number=self.evil_node_number,attack_edge_random_seed=self.attack_edge_random_seed)
-        self.attack_edge_dict = dict()
+        #self.attack_edge_dict = dict()
 
         print("creating attack edge")
+        """
         for i in range(0,self.attack_edge_number):
             edge = self.attack_edge_generator.get_next()
             self.attack_edge_dict[edge[0][0]] = (edge[0][1],edge[1])
             self.attack_edge_dict[edge[0][1]] = (edge[0][0],(edge[1][1],edge[1][0]))
+        """
+
+        for i in range(0,self.attack_edge_number):
+            edge = ((0,0),(0,0))
+            while (self.attack_edges.has_edge(start_node=edge[0][1],end_node=edge[1][0]) or edge==((0,0),(0,0))):
+                edge = self.attack_edge_generator.get_next()
+                self.attack_edges.add_edge(start_node=edge[0][0],end_node=edge[0][1],upload=edge[1][0],download=edge[1][1])
+                self.attack_edges.add_edge(start_node=edge[0][1],end_node=edge[0][0],upload=edge[1][1],download=edge[1][0])
 
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
@@ -125,6 +136,7 @@ class Simulation(DatagramProtocol):
     def generate_blocks(self,node):
         crypto = ECCrypto()
         blocks=[]
+        """
         if node.id in self.attack_edge_dict:
             print("network:-------this node has attack block, now return its attack block----------")
             print("the attack block public key is:")
@@ -140,6 +152,25 @@ class Simulation(DatagramProtocol):
             key = crypto.key_from_private_bin(node.private_key)
             block.sign(key=key)
             blocks.append(block)
+        """
+
+        if self.attack_edges.has_node(node.id):
+            print("network:-------this node has attack block, now return its attack block----------")
+            print("the attack block public key is:")
+            edges = self.attack_edges.get_all_edge(node=node.id)
+            for edge in edges:
+                block = HalfBlock()
+                block.up = edge[1][0]
+                block.total_up = edge[1][0]
+                block.down = edge[1][1]
+                block.total_down = edge[1][1]
+                block.sequence_number=edges.index(edge)+1
+                block.public_key = node.public_key
+                print(node.public_key)
+                key = crypto.key_from_private_bin(node.private_key)
+                block.sign(key=key)
+                blocks.append(block)
+
         else:
             data = self.link_generator.get_current()
 
@@ -263,15 +294,23 @@ class Simulation(DatagramProtocol):
         message_request.decode_introduction_request()
         #requester_neighbor = Neighbor(message_request.source_private_address,addr,identity = message_request.sender_identity)
         #node_to_introduce_id = (self.link_generator.get_next()[0]+int(node.id))%self.number_of_nodes
+        """
         node_to_introduce_id = None
         if node.id in self.attack_edge_dict and response_random_number>=self.response_threshold:
             print("network:---------this node has attack edge--------------")
             node_to_introduce_id = self.attack_edge_dict[node.id][0]
+        """
+
+        if self.attack_edges.has_node(node=node.id) and response_random_number>=self.response_threshold:
+            print("network:---------this node has attack edge--------------")
+            attack_edge=self.attack_edges.get_random_edge(node=node.id)
+            node_to_introduce_id=attack_edge[0][1]
+
         else:
             if node.honest == True:
                 node_to_introduce_id=(self.link_generator.get_next()[0]+node.id)%self.honest_node_number
             if node.honest == False:
-                node_to_introduce_id=self.honest_node_number+((self.link_generator.get_next()[0]+self.node.id)%self.evil_node_number)
+                node_to_introduce_id=self.honest_node_number+((self.link_generator.get_next()[0]+node.id)%self.evil_node_number)
         #node_to_introduce = self.node_database.get_node_by_id(id=node_to_introduce_id)
         node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)
         #introduced_private_address = neighbor_to_introduce
