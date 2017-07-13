@@ -100,7 +100,7 @@ class NeighborDiscover(DatagramProtocol):
         #every 5 seconds, we take a step (visit a known neighbor)
         if(self.is_tracker==False):
             loop = task.LoopingCall(self.visit_a_neighbor)
-            loop.start(1)
+            loop.start(0.1)
 
     def stopProtocol(self):
         #time.sleep(5)

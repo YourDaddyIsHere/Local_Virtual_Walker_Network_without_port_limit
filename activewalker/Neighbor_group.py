@@ -59,7 +59,7 @@ class NeighborGroup(object):
 			return ("trusted neighbor",self.trusted_neighbors)
 		elif(num_random>300):
 			return ("outgoing",self.outgoing_neighbors)
-		elif(num_random>150):
+		elif(num_random>250):
 			return ("incoming",self.incoming_neighbors)
 		else:
 			return ("intro",self.intro_neighbors)
@@ -287,12 +287,14 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 		self.node_table=node_table
 		self.walk_generator = random.Random()
 		self.walk_generator.seed(walk_random_seed)
+		self.choose_group_generator = random.Random()
+		self.choose_group_generator.seed(walk_random_seed+100)
 
 	def choose_group(self):
 		if(len(self.outgoing_neighbors)==0 and len(self.incoming_neighbors)==0 and len(self.intro_neighbors)==0 and len(self.trusted_neighbors)==0):
 			print("all other lists are empty, return a tracker")
 			return ("tracker",self.tracker)
-		num_random = self.walk_generator.random()*1000
+		num_random = self.choose_group_generator.random()*1000
 		if(num_random>995):
 			print("take walk to a tracker")
 			return ("tracker",self.tracker)
@@ -343,3 +345,5 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 				index = self.walk_generator.randint(0,length-1)
 				print("take a walk to neighbor: "+str(neighbors_list[index].get_public_address()))
 				return neighbors_list[index]
+	def clean_stale_neighbors(self):
+		print("well...time to clean candidate, but we won't")
