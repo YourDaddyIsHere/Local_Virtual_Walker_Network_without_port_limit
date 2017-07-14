@@ -120,6 +120,9 @@ class Simulation(DatagramProtocol):
                                                   introduction_seed=self.introduction_random_seed+20,block_seed=self.block_random_seed+20)
         self.response_generator = random.Random()
         self.response_generator.seed(self.response_seed)
+
+        self.response_generator_tracker = random.Random()
+        self.response_generator_tracker.seed(self.response_seed+1)
         self.attack_edge_generator = AttackEdgeGenerator(honest_node_number=self.honest_node_number,evil_node_number=self.evil_node_number,attack_edge_random_seed=self.attack_edge_random_seed)
         #self.attack_edge_dict = dict()
 
@@ -142,7 +145,7 @@ class Simulation(DatagramProtocol):
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
         neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=50)
+        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=10000)
         self.reactor.run()
         #now experiment stop, we should collect data and run analysis
         #call(["mkdir","testdir"])
@@ -283,7 +286,7 @@ class Simulation(DatagramProtocol):
         #a random number, determine whether the tracker should response with a evil node
         message_request = Message(packet=packet)
         message_request.decode_introduction_request()
-        response_random_number = self.response_generator.random()
+        response_random_number = self.response_generator_tracker.random()
         if response_random_number>self.tracker_evil_possibility:
             #response with an honest node
             print("trakcer:################introduce a honest node")
