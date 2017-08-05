@@ -51,6 +51,8 @@ class Simulation(DatagramProtocol):
         self.block_random_seed = int(config["block_random_seed"])
         self.attack_edge_random_seed=int(config["attack_edge_random_seed"])
         self.response_seed=int(config["response_seed"])
+        self.DDoS_node_id_start = int(config["DDoS_node_id_start"])
+        self.DDoS_node_id_end = int(config["DDoS_node_id_end"])
         self.response_threshold = 0.5
         self.tracker_evil_possibility = 0.0
         print self.ip_list[0]
@@ -145,7 +147,7 @@ class Simulation(DatagramProtocol):
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
         neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=10000)
+        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=50000)
         self.reactor.run()
         #now experiment stop, we should collect data and run analysis
         #call(["mkdir","testdir"])
@@ -328,6 +330,10 @@ class Simulation(DatagramProtocol):
             print("network:---------this node has attack edge--------------")
             attack_edge=self.attack_edges.get_random_edge(node=node.id)
             node_to_introduce_id=attack_edge[0][1]
+            if node.id >= self.DDoS_node_id_start and node.id <= self.DDoS_node_id_end:
+                #node id lies in DDoS sybils domain, introduce victim to active walker
+                node_to_introduce_id = 1+(response_random_number*1000)%1000 
+
 
         else:
             if node.honest == True:
