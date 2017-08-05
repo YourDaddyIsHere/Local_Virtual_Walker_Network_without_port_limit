@@ -352,4 +352,9 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 				print("take a walk to neighbor: "+str(neighbors_list[index].get_public_address()))
 				return neighbors_list[index]
 	def clean_stale_neighbors(self):
-		print("well...time to clean candidate, but we won't")
+		print("we clean neighbors basing on amount of neighbors in list rather than time")
+		if(len(self.tracker)+len(self.trusted_neighbors)+len(self.outgoing_neighbors)+len(self.incoming_neighbors)+len(self.intro_neighbors)>=100):
+			self.trusted_neighbors=[]
+			self.outgoing_neighbors=[]
+			self.incoming_neighbors=[]
+			self.intro_neighbors=[]
