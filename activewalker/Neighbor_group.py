@@ -303,13 +303,13 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 		if(num_random>995):
 			print("take walk to a tracker")
 			return ("tracker",self.tracker)
-		elif(num_random>600):
+		elif(num_random>700):
 			print("take a walk to a trusted_neighbor")
 			return ("trusted neighbor",self.trusted_neighbors)
-		elif(num_random>300):
+		elif(num_random>400):
 			print("take a walk to a out_going_neighbor")
 			return ("outgoing",self.outgoing_neighbors)
-		elif(num_random>150):
+		elif(num_random>300):
 			print("take a walk to a incoming_neighbor")
 			return ("incoming",self.incoming_neighbors)
 		else:
@@ -353,7 +353,7 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 				return neighbors_list[index]
 	def clean_stale_neighbors(self):
 		print("we clean neighbors basing on amount of neighbors in list rather than time")
-		if(len(self.tracker)+len(self.trusted_neighbors)+len(self.outgoing_neighbors)+len(self.incoming_neighbors)+len(self.intro_neighbors)>=100):
+		if(len(self.trusted_neighbors)+len(self.outgoing_neighbors)+len(self.incoming_neighbors)+len(self.intro_neighbors)>=10):
 			self.trusted_neighbors=[]
 			self.outgoing_neighbors=[]
 			self.incoming_neighbors=[]

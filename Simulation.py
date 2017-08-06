@@ -53,6 +53,7 @@ class Simulation(DatagramProtocol):
         self.response_seed=int(config["response_seed"])
         self.DDoS_node_id_start = int(config["DDoS_node_id_start"])
         self.DDoS_node_id_end = int(config["DDoS_node_id_end"])
+        self.number_of_victims = int(config["number_of_victims"])
         self.response_threshold = 0.5
         self.tracker_evil_possibility = 0.0
         print self.ip_list[0]
@@ -332,7 +333,7 @@ class Simulation(DatagramProtocol):
             node_to_introduce_id=attack_edge[0][1]
             if node.id >= self.DDoS_node_id_start and node.id <= self.DDoS_node_id_end:
                 #node id lies in DDoS sybils domain, introduce victim to active walker
-                node_to_introduce_id = 1+(response_random_number*1000)%1000 
+                node_to_introduce_id = 1+(response_random_number*self.number_of_victims)%self.number_of_victims
 
 
         else:
