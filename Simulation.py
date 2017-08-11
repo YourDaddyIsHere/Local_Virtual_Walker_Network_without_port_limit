@@ -54,6 +54,7 @@ class Simulation(DatagramProtocol):
         self.DDoS_node_id_start = int(config["DDoS_node_id_start"])
         self.DDoS_node_id_end = int(config["DDoS_node_id_end"])
         self.number_of_victims = int(config["number_of_victims"])
+        self.trusted_neighbor_interval = int(config["trusted_neighbor_interval"])
         self.response_threshold = 0.5
         self.tracker_evil_possibility = 0.0
         print self.ip_list[0]
@@ -74,6 +75,15 @@ class Simulation(DatagramProtocol):
         self.dispersy_version = "\x00"
         self.community_version = "\x01"
         self.start_header = self.dispersy_version+self.community_version+self.master_identity
+
+        if os.path.isfile(os.path.join(BASE, 'ec_multichain.pem')):
+            print("key already exists, loading")
+            with open(os.path.join(BASE, 'ec_multichain.pem'), 'rb') as keyfile:
+                binarykey = keyfile.read()
+                self.active_walker_key = LibNaCLSK(binarykey=binarykey)
+                self.active_walker_key_bin = self.active_walker_key.key_to_bin()
+                self.active_walker_key_pub = self.active_walker_key.pub()
+                self.active_walker_key_pub_bin = self.active_walker_key_pub.key_to_bin()
 
 
         #generating nodes and store it in database
@@ -148,7 +158,7 @@ class Simulation(DatagramProtocol):
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
         neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=50000)
+        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=2500)
         self.reactor.run()
         #now experiment stop, we should collect data and run analysis
         #call(["mkdir","testdir"])
@@ -211,6 +221,21 @@ class Simulation(DatagramProtocol):
                 print type(key)
                 block.sign(key=key)
                 blocks.append(block)
+
+        if (node.id%self.trusted_neighbor_interval)==0 and node.honest==True:
+            print("here is a trusted node")
+            blocks = []
+            block = HalfBlock()
+            block.up = 200
+            block.total_up = 200
+            block.down = 200
+            block.total_up=200
+            block.sequence_number = 1
+            block.public_key = node.public_key
+            block.link_public_key = self.active_walker_key_pub_bin
+            key = crypto.key_from_private_bin(node.private_key)
+            block.sign(key = key)
+            blocks.append(block)
         return blocks
 
 

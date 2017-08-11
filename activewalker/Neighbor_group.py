@@ -191,6 +191,7 @@ class NeighborGroup(object):
 			#if it has public key
 			if neighbor.public_key:
 				if Graph.has_trust_path(your_node=my_public_key,node_to_be_trusted=neighbor.public_key):
+					print("add a neighbor to trusted list--------------------------------------------------------")
 					self.add_neighbor_to_trusted_list(neighbor)
 					self.outgoing_neighbors = [x for x in self.outgoing_neighbors if x is not neighbor]
 		#check for incoming_neighbors
@@ -198,9 +199,11 @@ class NeighborGroup(object):
 			#if it has public key
 			if neighbor.public_key:
 				if Graph.has_trust_path(your_node=my_public_key,node_to_be_trusted=neighbor.public_key):
+					print("add a neighbor to trusted list--------------------------------------------------------")
 					self.add_neighbor_to_trusted_list(neighbor)
 					self.incoming_neighbors = [x for x in self.incoming_neighbors if x is not neighbor]
 		#we have no way to know the public key of an intro neighbor, ignore them
+
 
 
 		pass
