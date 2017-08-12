@@ -158,7 +158,7 @@ class Simulation(DatagramProtocol):
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
         neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=2500)
+        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=50000)
         self.reactor.run()
         #now experiment stop, we should collect data and run analysis
         #call(["mkdir","testdir"])
@@ -318,11 +318,13 @@ class Simulation(DatagramProtocol):
         if response_random_number>self.tracker_evil_possibility:
             #response with an honest node
             print("trakcer:################introduce a honest node")
+            self.link_generator_tracker.link_range = self.honest_node_number
             node_to_introduce_id=((self.link_generator_tracker.get_next()[0]+node.id)%self.honest_node_number)+1
             print("node to introduce is: "+str(node_to_introduce_id))
         else:
             print("tracker:################introduce a evil node")
             #response with an evil node
+            self.link_generator_tracker.link_range = self.evil_node_number
             node_to_introduce_id=(self.honest_node_number+((self.link_generator_tracker.get_next()[0]+node.id)%self.evil_node_number))+1
             print("node to introduce is: "+str(node_to_introduce_id))
         node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)

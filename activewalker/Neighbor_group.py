@@ -55,7 +55,7 @@ class NeighborGroup(object):
 		num_random = random.random()*1000
 		if(num_random>995):
 			return ("tracker",self.tracker)
-		elif(num_random>600):
+		elif(num_random>500):
 			return ("trusted neighbor",self.trusted_neighbors)
 		elif(num_random>300):
 			return ("outgoing",self.outgoing_neighbors)
@@ -204,9 +204,10 @@ class NeighborGroup(object):
 					self.incoming_neighbors = [x for x in self.incoming_neighbors if x is not neighbor]
 		#we have no way to know the public key of an intro neighbor, ignore them
 
-
-
-		pass
+	def get_trusted_neighbor(self):
+		neighbor_list = self.trusted_neighbors
+		random.shuffle(neighbor_list)
+		return neighbor_list[0]
 
 	def get_neighbor_to_walk(self):
 		self.clean_stale_neighbors()
@@ -295,6 +296,8 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 		self.node_table=node_table
 		self.walk_generator = random.Random()
 		self.walk_generator.seed(walk_random_seed)
+		self.trusted_neighbor_generator = random.Random()
+		self.trusted_neighbor_generator.seed(walk_random_seed+50)
 		self.choose_group_generator = random.Random()
 		self.choose_group_generator.seed(walk_random_seed+100)
 
@@ -306,13 +309,13 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 		if(num_random>995):
 			print("take walk to a tracker")
 			return ("tracker",self.tracker)
-		elif(num_random>700):
+		elif(num_random>500):
 			print("take a walk to a trusted_neighbor")
 			return ("trusted neighbor",self.trusted_neighbors)
-		elif(num_random>400):
+		elif(num_random>300):
 			print("take a walk to a out_going_neighbor")
 			return ("outgoing",self.outgoing_neighbors)
-		elif(num_random>300):
+		elif(num_random>150):
 			print("take a walk to a incoming_neighbor")
 			return ("incoming",self.incoming_neighbors)
 		else:
@@ -338,10 +341,15 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 		else:
 			#random_number = random.random()*1000
 			random_number = self.walk_generator.random()*1000
-			#0.8 possibility to take next hop
+			#possibility to take next hop
 			if(random_number>=self.teleport_home_possibility*1000):
 				return self.current_neighbor
-			#0.2 possibility to teleport home and take a random neighbor in our inventory
+			#possibility to teleport home and take a random neighbor in our inventory
+			#if there are trusted  neighbors in list
+			elif len(self.trusted_neighbors)>0:
+				neighbor_to_return = self.get_trusted_neighbor()
+				return neighbor_to_return
+			#if there are not trusted neighbor in list
 			else:
 				self.current_neighbor=None
 				#self.clean_untrusted_neighbor()
@@ -349,6 +357,7 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 				list_type=""
 				while(len(neighbors_list)==0):
 					list_type,neighbors_list = self.choose_group()
+				print("take "+str(list_type)+" to walk")
 				#random.shuffle(neighbors_list)
 				length = len(neighbors_list)
 				index = self.walk_generator.randint(0,length-1)
@@ -356,8 +365,13 @@ class Pseudo_Random_NeighborGroup(NeighborGroup):
 				return neighbors_list[index]
 	def clean_stale_neighbors(self):
 		print("we clean neighbors basing on amount of neighbors in list rather than time")
-		if(len(self.trusted_neighbors)+len(self.outgoing_neighbors)+len(self.incoming_neighbors)+len(self.intro_neighbors)>=10):
+		if(len(self.trusted_neighbors)+len(self.outgoing_neighbors)+len(self.incoming_neighbors)+len(self.intro_neighbors)>=20):
 			self.trusted_neighbors=[]
 			self.outgoing_neighbors=[]
 			self.incoming_neighbors=[]
 			self.intro_neighbors=[]
+
+	def get_trusted_neighbor(self):
+		print("here is get trusted neighbor-------------------------------------------")
+		index = self.trusted_neighbor_generator.randint(0,len(self.trusted_neighbors)-1)
+		return self.trusted_neighbors[index]
