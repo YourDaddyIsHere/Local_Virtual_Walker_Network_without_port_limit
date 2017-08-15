@@ -4,7 +4,7 @@ from activewalker.crypto import LibNaCLSK, ECCrypto
 from activewalker.Message import Message
 import os
 from Generator import WalkNumberGenerator,LinkNumberGenerator,AttackEdgeGenerator
-from activewalker.Neighbor_group import Determinstic_NeighborGroup,Pseudo_Random_NeighborGroup
+from activewalker.Neighbor_group import Pseudo_Random_no_transitive_Trust_NeighborGroup,Pseudo_Random_NeighborGroup
 from activewalker.neighbor_discovery import NeighborDiscover
 from activewalker.HalfBlockDatabase import HalfBlock
 from subprocess import call
@@ -16,7 +16,12 @@ from hashlib import sha1
 from NodeTable import NodeTable
 import random
 from EdgeSet import EdgeSet
+import logging
 BASE = os.path.dirname(os.path.abspath(__file__))
+
+logging.basicConfig(level=logging.DEBUG, filename=os.path.join(BASE, 'logfile'), filemode="a+",format="%(asctime)-15s %(levelname)-8s %(message)s")
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class Placeholder(object):
     def __init__(self,crypto,my_public_key,my_key,my_identity,start_header,global_time):
@@ -37,6 +42,7 @@ class Simulation(DatagramProtocol):
         self.port=port
         self.honest_node_number = int(config["honest_node_number"])
         self.evil_node_number = int(config["evil_node_number"])
+        self.total_node_number = self.evil_node_number+self.honest_node_number
         self.number_of_nodes = self.honest_node_number + self.evil_node_number
         self.link_per_node = int(config["link_per_node"])
         self.upload_cap = int(config["upload_cap"])
@@ -125,7 +131,7 @@ class Simulation(DatagramProtocol):
                                                   introduction_seed=self.introduction_random_seed,block_seed=self.block_random_seed)
 
         self.link_generator_tracker = LinkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number,number_of_link=self.link_per_node,
-                                                  link_range=self.link_range,upload_cap=self.upload_cap,download_cap=self.download_cap,
+                                                  link_range=self.total_node_number,upload_cap=self.upload_cap,download_cap=self.download_cap,
                                                   introduction_seed=self.introduction_random_seed+10,block_seed=self.block_random_seed+10)
 
         self.link_generator_block = LinkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number,number_of_link=self.link_per_node,
@@ -157,8 +163,10 @@ class Simulation(DatagramProtocol):
 
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
-        neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=50000)
+        #neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        neighbor_group = Pseudo_Random_no_transitive_Trust_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        
+        self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=10000)
         self.reactor.run()
         #now experiment stop, we should collect data and run analysis
         #call(["mkdir","testdir"])
@@ -318,13 +326,15 @@ class Simulation(DatagramProtocol):
         if response_random_number>self.tracker_evil_possibility:
             #response with an honest node
             print("trakcer:################introduce a honest node")
-            self.link_generator_tracker.link_range = self.honest_node_number
+            logger.info("trakcer:################introduce a honest node")
+            #self.link_generator_tracker.link_range = self.honest_node_number
             node_to_introduce_id=((self.link_generator_tracker.get_next()[0]+node.id)%self.honest_node_number)+1
             print("node to introduce is: "+str(node_to_introduce_id))
         else:
             print("tracker:################introduce a evil node")
+            logger.info("trakcer:################introduce a honest node")
             #response with an evil node
-            self.link_generator_tracker.link_range = self.evil_node_number
+            #self.link_generator_tracker.link_range = self.evil_node_number
             node_to_introduce_id=(self.honest_node_number+((self.link_generator_tracker.get_next()[0]+node.id)%self.evil_node_number))+1
             print("node to introduce is: "+str(node_to_introduce_id))
         node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)
@@ -358,9 +368,11 @@ class Simulation(DatagramProtocol):
             print("network:---------this node has attack edge--------------")
             attack_edge=self.attack_edges.get_random_edge(node=node.id)
             node_to_introduce_id=attack_edge[0][1]
-            if node.id >= self.DDoS_node_id_start and node.id <= self.DDoS_node_id_end:
+
+            #launching DDoS attack, redirect walker to victim
+            #if node.id >= self.DDoS_node_id_start and node.id <= self.DDoS_node_id_end:
                 #node id lies in DDoS sybils domain, introduce victim to active walker
-                node_to_introduce_id = 1+(response_random_number*self.number_of_victims)%self.number_of_victims
+                #node_to_introduce_id = 1+(response_random_number*self.number_of_victims)%self.number_of_victims
 
 
         else:
