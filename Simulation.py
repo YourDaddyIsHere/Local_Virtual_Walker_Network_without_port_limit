@@ -163,8 +163,8 @@ class Simulation(DatagramProtocol):
 
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
-        #neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        neighbor_group = Pseudo_Random_no_transitive_Trust_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        #neighbor_group = Pseudo_Random_no_transitive_Trust_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
         
         self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=10000)
         self.reactor.run()
