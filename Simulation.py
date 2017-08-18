@@ -45,6 +45,7 @@ class Simulation(DatagramProtocol):
         self.total_node_number = self.evil_node_number+self.honest_node_number
         self.number_of_nodes = self.honest_node_number + self.evil_node_number
         self.link_per_node = int(config["link_per_node"])
+        self.length_peer_list = 20
         self.upload_cap = int(config["upload_cap"])
         self.download_cap = int(config["upload_cap"])
         self.link_range = int(config["link_range"])
@@ -69,6 +70,7 @@ class Simulation(DatagramProtocol):
         self.node_table = NodeTable()
         self.reactor = reactor
         self.attack_edges = EdgeSet()
+        self.request_count = 0
 
         self.master_key = "3081a7301006072a8648ce3d020106052b8104002703819200040503dac58c19267f12cb0cf667e480816cd2574acae" \
                      "5293b59d7c3da32e02b4747f7e2e9e9c880d2e5e2ba8b7fcc9892cb39b797ef98483ffd58739ed20990f8e3df7d1ec5" \
@@ -163,8 +165,8 @@ class Simulation(DatagramProtocol):
 
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
-        neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        #neighbor_group = Pseudo_Random_no_transitive_Trust_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        #neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        neighbor_group = Pseudo_Random_no_transitive_Trust_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
         
         self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=10000)
         self.reactor.run()
@@ -351,6 +353,22 @@ class Simulation(DatagramProtocol):
 
     #will be called when a non-tracker node get an introduction request
     def on_introduction_request(self,packet,addr,node,placeholder):
+        self.request_count = self.request_count+1
+        introduction_list = []
+        peer_generator = random.Random()
+        peer_generator.seed(node.id)
+        peer_picker = random.Random()
+        peer_picker.seed(self.request_count)
+        for i in range(0,self.length_peer_list+1):
+            peer_node_id = peer_generator.randint((-1*self.link_range),self.link_range)
+            if peer_node_id == 0:
+                peer_node_id = 1
+            introduction_list.append(peer_node_id)
+        peer_to_introduce_index = peer_picker.randint(0,len(introduction_list)-1)
+        peer_to_introduce = introduction_list[peer_to_introduce_index]
+
+
+
         #generate a random number, determine whether the node should response with an attack edge (if it has)
         response_random_number = self.response_generator.random()
         message_request = Message(packet=packet)
@@ -377,9 +395,11 @@ class Simulation(DatagramProtocol):
 
         else:
             if node.honest == True:
-                node_to_introduce_id=((self.link_generator.get_next()[0]+node.id)%self.honest_node_number)+1
+                #node_to_introduce_id=((self.link_generator.get_next()[0]+node.id)%self.honest_node_number)+1
+                node_to_introduce_id =((peer_to_introduce+node.id)%self.honest_node_number)+1
             if node.honest == False:
-                node_to_introduce_id=(self.honest_node_number+((self.link_generator.get_next()[0]+node.id)%self.evil_node_number))+1
+                #node_to_introduce_id=(self.honest_node_number+((self.link_generator.get_next()[0]+node.id)%self.evil_node_number))+1
+                node_to_introduce_id=(self.honest_node_number+((peer_to_introduce+node.id)%self.evil_node_number))+1
         #node_to_introduce = self.node_database.get_node_by_id(id=node_to_introduce_id)
         node_to_introduce = self.node_table.get_node_by_id(id=node_to_introduce_id)
         #introduced_private_address = neighbor_to_introduce
