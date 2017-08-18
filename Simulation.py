@@ -4,7 +4,7 @@ from activewalker.crypto import LibNaCLSK, ECCrypto
 from activewalker.Message import Message
 import os
 from Generator import WalkNumberGenerator,LinkNumberGenerator,AttackEdgeGenerator
-from activewalker.Neighbor_group import Pseudo_Random_no_transitive_Trust_NeighborGroup,Pseudo_Random_NeighborGroup
+from activewalker.Neighbor_group import Pseudo_Random_no_transitive_Trust_NeighborGroup,Pseudo_Random_NeighborGroup,Pseudo_Random_teleport_home_NeighborGroup
 from activewalker.neighbor_discovery import NeighborDiscover
 from activewalker.HalfBlockDatabase import HalfBlock
 from subprocess import call
@@ -39,6 +39,7 @@ class Simulation(DatagramProtocol):
         if os.path.isfile("activewalker/BlockDataBase.db"):
             call(["rm","activewalker/BlockDataBase.db"])
         config = ConfigObj(config_file)
+        self.teleport_home_possibility = 0.5
         self.port=port
         self.honest_node_number = int(config["honest_node_number"])
         self.evil_node_number = int(config["evil_node_number"])
@@ -166,7 +167,8 @@ class Simulation(DatagramProtocol):
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
         #neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        neighbor_group = Pseudo_Random_no_transitive_Trust_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        #neighbor_group = Pseudo_Random_no_transitive_Trust_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        neighbor_group = Pseudo_Random_teleport_home_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed,teleport_home_possibility=self.teleport_home_possibility)
         
         self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=10000)
         self.reactor.run()
