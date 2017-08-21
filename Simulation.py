@@ -202,6 +202,13 @@ class Simulation(DatagramProtocol):
             print("the attack block public key is:")
             edges = self.attack_edges.get_all_edge(node=node.id)
             for edge in edges:
+                link_node_id_raw = edge[0][1]
+                link_node_id = -1
+                if node.honest==True:
+                    link_node_id = (link_node_id_raw+node.id)%self.honest_node_number
+                else:
+                    link_node_id = self.honest_node_number+((link_node_id_raw+node.id)%self.evil_node_number)
+                link_node = self.node_table.get_node_by_id(link_node_id)
                 block = HalfBlock()
                 block.up = edge[1][0]
                 block.total_up = edge[1][0]
@@ -209,6 +216,7 @@ class Simulation(DatagramProtocol):
                 block.total_down = edge[1][1]
                 block.sequence_number=edges.index(edge)+1
                 block.public_key = node.public_key
+                block.link_public_key = link_node.public_key
                 print(node.public_key)
                 key = crypto.key_from_private_bin(node.private_key)
                 block.sign(key=key)
@@ -221,13 +229,19 @@ class Simulation(DatagramProtocol):
             for i in range(1,len(data)):
                 record = data[i]
                 block = HalfBlock()
-                link_node_id = record[0]
+                link_node_id_raw = record[0]
+                if node.honest==True:
+                    link_node_id = (link_node_id_raw+node.id)%self.honest_node_number
+                else:
+                    link_node_id = self.honest_node_number+((link_node_id_raw+node.id)%self.evil_node_number)
+                link_node = self.node_table.get_node_by_id(link_node_id)
                 block.up = record[1]
                 block.total_up = record[1]
                 block.down = record[2]
                 block.total_down = record[2]
                 block.sequence_number = i
                 block.public_key = node.public_key
+                block.link_public_key = link_node.public_key
                 key = crypto.key_from_private_bin(node.private_key)
                 print("the type of key is")
                 print type(key)
@@ -236,13 +250,13 @@ class Simulation(DatagramProtocol):
 
         if (node.id%self.trusted_neighbor_interval)==0 and node.honest==True:
             print("here is a trusted node")
-            blocks = []
+            #blocks = []
             block = HalfBlock()
             block.up = 200
             block.total_up = 200
             block.down = 200
             block.total_up=200
-            block.sequence_number = 1
+            block.sequence_number = 5
             block.public_key = node.public_key
             block.link_public_key = self.active_walker_key_pub_bin
             key = crypto.key_from_private_bin(node.private_key)
