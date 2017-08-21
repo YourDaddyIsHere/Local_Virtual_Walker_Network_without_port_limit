@@ -63,6 +63,7 @@ class Simulation(DatagramProtocol):
         self.DDoS_node_id_end = int(config["DDoS_node_id_end"])
         self.number_of_victims = int(config["number_of_victims"])
         self.trusted_neighbor_interval = int(config["trusted_neighbor_interval"])
+        self.attack_edge_block_interval = int(config["attack_edge_block_interval"])
         self.response_threshold = 0.5
         self.tracker_evil_possibility = 0.0
         print self.ip_list[0]
@@ -216,7 +217,8 @@ class Simulation(DatagramProtocol):
                 block.total_down = edge[1][1]
                 block.sequence_number=edges.index(edge)+1
                 block.public_key = node.public_key
-                block.link_public_key = link_node.public_key
+                if node.id%self.trusted_neighbor_interval == 0:
+                    block.link_public_key = link_node.public_key
                 print(node.public_key)
                 key = crypto.key_from_private_bin(node.private_key)
                 block.sign(key=key)
