@@ -48,6 +48,7 @@ class LinkNumberGenerator(object):
         #every element in list is a list consisting of 1 integer and multiple tuples
         #the integer means the bias, giving lights of the neighbor will be introduced to others
         #the following  tuples indicate the upload and download of some edges, one tuple for one edge
+        """
         for i in range(1,number_of_nodes+1):
             link = [randint(-1*link_range,link_range)]
             for j in range(0,number_of_link):
@@ -56,6 +57,7 @@ class LinkNumberGenerator(object):
             self.list.append(link)
         #print self.list
         pickle.dump( self.list, open( "link_seed.p", "wb" ) )
+        """
 
     def generate(self):
         result = []

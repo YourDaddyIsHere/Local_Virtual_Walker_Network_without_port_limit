@@ -167,9 +167,9 @@ class Simulation(DatagramProtocol):
 
 
         #neighbor_group = Determinstic_NeighborGroup(walk_generator=self.walk_generator,node_table=self.node_table)
-        #neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
+        neighbor_group = Pseudo_Random_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
         #neighbor_group = Pseudo_Random_no_transitive_Trust_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed)
-        neighbor_group = Pseudo_Random_teleport_home_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed,teleport_home_possibility=self.teleport_home_possibility)
+        #neighbor_group = Pseudo_Random_teleport_home_NeighborGroup(node_table=self.node_table,walk_random_seed=self.walk_random_seed,teleport_home_possibility=self.teleport_home_possibility)
         
         self.walker = NeighborDiscover(is_listening=False,message_sender=self.receive_packet,neighbor_group=neighbor_group,step_limit=10000)
         self.reactor.run()
@@ -227,7 +227,7 @@ class Simulation(DatagramProtocol):
         else:
             data = self.link_generator_block.get_current()
 
-            print("the node's private key is: "+repr(node.private_key))
+            #print("the node's private key is: "+repr(node.private_key))
             for i in range(1,len(data)):
                 record = data[i]
                 block = HalfBlock()
@@ -245,8 +245,8 @@ class Simulation(DatagramProtocol):
                 block.public_key = node.public_key
                 block.link_public_key = link_node.public_key
                 key = crypto.key_from_private_bin(node.private_key)
-                print("the type of key is")
-                print type(key)
+                #print("the type of key is")
+                #print type(key)
                 block.sign(key=key)
                 blocks.append(block)
 
@@ -294,7 +294,7 @@ class Simulation(DatagramProtocol):
         print("network:---the public key of the node is:"+repr(my_public_key))
 
         message_type = ord(packet[22])
-        print("message id is:"+str(message_type))
+        #print("message id is:"+str(message_type))
         if message_type == 247:
             print("network:---here is a missing-identity message")
             self.on_missing_identity(packet,active_walker_addr,node,placeholder)
@@ -459,11 +459,11 @@ class Simulation(DatagramProtocol):
         blocks=self.generate_blocks(node = node)
         #blocks = self.block_database.get_blocks_since(public_key=node.public_key,sequence_number=int(message_crawl_request.requested_sequence_number))
         #blocks = self.block_database.get_blocks_since(public_key=public_key,sequence_number=1)
-        print(blocks)
+        #print(blocks)
         messages_to_send = []
         for block in blocks:
             message = Message(neighbor_discovery=placeholder,block=block)
-            print("network:---we have following blocks to send: "+str(block.up))
+            #print("network:---we have following blocks to send: "+str(block.up))
             message.encode_halfblock()
             #messages_to_send.append((message.packet,addr))
             self.send_packet(message.packet,(str(node.ip),int(node.port)))
