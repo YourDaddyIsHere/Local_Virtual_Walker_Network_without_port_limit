@@ -225,6 +225,9 @@ class Simulation(DatagramProtocol):
                 blocks.append(block)
 
         else:
+            link_generator_block = LinkNumberGenerator(number_of_nodes=self.honest_node_number+self.evil_node_number,number_of_link=self.link_per_node,
+                                                  link_range=self.link_range,upload_cap=self.upload_cap,download_cap=self.download_cap,
+                                                  introduction_seed=int(node.id)+20,block_seed=int(node.id)+30)
             data = self.link_generator_block.get_current()
 
             #print("the node's private key is: "+repr(node.private_key))
